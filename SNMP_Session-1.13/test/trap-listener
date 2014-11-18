@@ -1,0 +1,148 @@
+#!/usr/local/bin/perl -w
+###
+### Listen for SNMP traps, decode and print them
+### Simple example for a trap listener program.
+###
+### To make this useful, you should probably add some filtering
+### capabilities and trap-specific pretty-printing.
+###
+package main;
+
+use strict;
+
+use SNMP_Session;
+use SNMP_util;
+use BER;
+use Socket;
+
+### Forward declarations
+sub print_trap ($$);
+sub usage ($ );
+sub print_ip_addr ($ );
+sub pretty_addr ($ );
+sub hostname ($ );
+sub fromOID ($ );
+sub fromOID_aux ($$);
+sub really_pretty_oid ($);
+
+my $port = 162;
+
+my $print_community = 0;
+my $print_port = 0;
+my $print_hostname = 1;
+
+register_pretty_printer {BER::object_id_tag(), \&really_pretty_oid};
+
+while (defined $ARGV[0] && $ARGV[0] =~ /^-/) {
+    if ($ARGV[0] eq '-p') {
+	shift @ARGV;
+	usage (1) unless defined $ARGV[0];
+	$port = $ARGV[0];
+	usage (1) unless $port > 0 && $port < 65536;
+    } elsif ($ARGV[0] eq '-h') {
+	usage (0);
+	exit 0;
+    } else {
+	usage (1);
+    }
+}
+snmpLoad_OID_Cache($SNMP_util::CacheFile);
+die unless SNMP_util::toOID("mib-2") eq SNMP_util::toOID ("1.3.6.1.2.1");
+%SNMP_util::revOIDS = reverse %SNMP_util::OIDS unless %SNMP_util::revOIDS;
+my $session = SNMPv2c_Session->open_trap_session ($port)
+    or die "couldn't open trap session";
+$SNMP_Session::suppress_warnings = 1; # We print all error messages ourselves.
+my ($trap, $sender, $sender_port);
+
+while (($trap, $sender, $sender_port) = $session->receive_trap ()) {
+    my $now_string = localtime time;
+    print "$now_string ";
+    print pretty_addr (inet_ntoa ($sender));
+    print ".$sender_port" if $print_port;
+    print "\n";
+    print_trap ($session, $trap);
+}
+1;
+
+sub print_trap ($$) {
+    my ($this, $trap) = @_;
+    my ($encoded_pair, $oid, $value);
+    my ($community, $ent, $agent, $gen, $spec, $dt, $bindings)
+	= $this->decode_trap_request ($trap);
+    if (defined $community) {
+	my ($binding, $prefix);
+	if (defined $community) {
+	    print "    community: ".$community."\n"
+		if $print_community;
+	    if (defined $ent) {
+		## SNMPv1 Trap
+		print "   enterprise: ".BER::pretty_oid ($ent)."\n";
+		print "   agent addr: ".inet_ntoa ($agent)."\n";
+		print "   generic ID: $gen\n";
+		print "  specific ID: $spec\n";
+		print "       uptime: ".BER::pretty_uptime_value ($dt)."\n";
+	    }
+	    ## Otherwise we have an SNMPv1 Trap which basically just
+	    ## consists of bindings.
+	    ##
+	    $prefix = "     bindings: ";
+	    while ($bindings) {
+		($binding,$bindings) = decode_sequence ($bindings);
+		($oid,$value) = decode_by_template ($binding, "%O%@");
+		$oid = fromOID (BER::pretty_oid ($oid));
+		print $prefix.$oid.": ".pretty_print ($value)."\n";
+		$prefix = "               ";
+	    }
+	} else {
+	    warn "decoding trap request failed:\n".$SNMP_Session::errmsg;
+	}
+    } else {
+	warn "receiving trap request failed:\n".$SNMP_Session::errmsg;
+    }
+}
+
+sub usage ($) {
+    warn <<EOM;
+Usage: $0 [-p port]
+       $0 -h
+
+  -h           print this usage message and exit.
+
+  -p port      Select the UDP port on which the program will listen
+  	       for SNMP traps.  The default port is 162.
+
+EOM
+    exit (1) if $_[0];
+}
+
+sub pretty_addr ($ ) {
+    my ($addr) = @_;
+    my ($hostname,$aliases,$addrtype,$length,@addrs)
+	= gethostbyaddr (inet_aton ($addr), AF_INET);
+    $hostname ? $hostname." [".$addr."]" : $addr;
+}
+
+sub hostname ($ ) {
+    my ($addr) = @_;
+    my ($hostname,$aliases,$addrtype,$length,@addrs)
+	= gethostbyaddr (inet_aton ($addr), AF_INET);
+    $hostname || "[".$addr."]";
+}
+
+sub fromOID ($ ) {
+    my ($oid) = @_;
+    return fromOID_aux ($oid, '') || $oid;
+}
+
+sub fromOID_aux ($$) {
+    my ($pref, $suf) = @_;
+    while (1) {
+	return $SNMP_util::revOIDS{$pref}.$suf if exists $SNMP_util::revOIDS{$pref};
+	return undef unless $pref =~ /(.*)(\.[0-9]+)$/;
+	$pref = $1; $suf = $2.$suf;
+    }
+}
+
+sub really_pretty_oid ($) {
+    fromOID (BER::pretty_oid ($_[0]));
+}

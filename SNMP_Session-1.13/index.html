@@ -1,0 +1,408 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
+<HTML>
+ <HEAD>
+  <TITLE>SNMP support for Perl 5</TITLE>
+ </HEAD>
+ <BODY bgcolor="#ffffff">
+<DIV ALIGN=CENTER>
+  <H1>SNMP support for Perl 5</H1>
+
+  <p> Copyright (c) 1995-2008, Simon Leinen<br>
+  All rights reserved </p>
+
+  <em> This program is free software; you can redistribute it under
+  the <a href="dist/Artistic">"Artistic License 2.0"</a> included in
+  this distribution. </em>
+
+  <p>Author: <A HREF="http://www.switch.ch/misc/leinen/">Simon
+Leinen</A> &lt;<A
+HREF="mailto:simon.leinen@switch.ch">simon.leinen@switch.ch</A>&gt;</p>
+
+</DIV>
+
+<p> This package contains Perl 5 modules <tt>SNMP_Session.pm</tt>,
+<tt>BER.pm</tt>, and <tt>SNMP_util.pm</tt> which, when used together,
+provide rudimentary access to remote <a
+href="http://www.switch.ch/misc/leinen/snmp/">SNMP</a> (v1/v2)
+agents. </p>
+
+<p> <b> Download it from <a href="http://www.switch.ch/misc/leinen/snmp/perl/dist/"><tt>http://www.switch.ch/misc/leinen/snmp/perl/dist/</tt></a></b> </p>
+
+<!--            <iframe marginwidth="0" marginheight="0" width="120" height="240" scrolling="no" frameborder="0" src="http://rcm.amazon.com/e/cm?o=1&l=as1&f=ifr&t=simonleinensbook&p=8&asins=0596000200&IS2=1&amp;lt1=_blank"><MAP NAME="boxmap-p8"><AREA SHAPE="RECT" COORDS="14, 200, 103, 207" HREF="http://rcm.amazon.com/e/cm/privacy-policy.html?o=1" ><AREA COORDS="0,0,10000,10000" HREF="http://www.amazon.com/exec/obidos/redirect-home/simonleinensbook" ></map><img src="http://rcm-images.amazon.com/images/G/01/rcm/120x240.gif" width="120" height="240" border="0" usemap="#boxmap-p8" alt="Shop at Amazon.com"></iframe>    -->         
+
+<p> The library is featured in the book <em><a
+href="http://www.oreilly.com/catalog/esnmp/">Essential SNMP</a></em>
+by Douglas R. Mauro and Kevin J. Schmidt, July 2001, O'Reilly &amp;
+Associates, ISBN: 0-59600020-0.  You can buy it on-line at <a
+href="http://www.amazon.com/exec/obidos/ASIN/0596000200/simonleinensbook/ref=nosim/"><img
+border=0 width=90 height=29 align="middle"
+src="http://www.switch.ch/misc/leinen/images/amazon/90X29-w-logo.gif"
+alt="Amazon.com"></a> <a
+href="http://www.amazon.de/exec/obidos/ASIN/0596000200/simonleinensbo0d/ref=nosim/"><img
+align="middle"
+src="http://www.switch.ch/misc/leinen/images/amazon/w_90x31.gif"
+width=90 height=31 border="0" alt="In Partnerschaft mit
+Amazon.de"></a>. </p>
+
+<H2>Features</H2>
+
+<P> This module differs from existing SNMP packages in that it is
+ completely stand-alone, i.e. you don't need to have another SNMP
+ package such as Net-SNMP.  It is also written entirely in Perl, so
+ you don't have to compile any C modules.  It uses the Perl 5
+ <SAMP>Socket.pm</SAMP> module and should therefore be very portable,
+ even to non-Unix systems. </P>
+
+<p> Note: For the development of new scripts, I strongly recommend to
+use the higher-level programming interface provided by
+<tt>SNMP_util.pm</tt>.  Its use is described in <a
+href="dist/README.SNMP_util"><tt>README.SNMP_util</tt></a>.  The
+remainder of this page desribes the low-level API in
+<tt>SNMP_Session.pm</tt>, which you normally shouldn't use. </p>
+
+<p> The SNMP operations currently supported are "get", "get-next",
+ "get-bulk" and "set", as well as trap generation and reception. </p>
+
+<p> For an excellent example of the type of application this is useful
+ for, see Tobias
+ Oetiker's <a href="URL:http://oss.oetiker.ch/mrtg/">``mrtg'' (Multi
+ Router Traffic Grapher)</a> tool.  Another application that uses this
+ library is <a href="http://www.dynw.com/iog/">IOG</a> (Input/Output
+ Grapher). </p>
+
+<h2> Recent Changes: </h2>
+
+<p> For a list of changes, see the <samp><a
+href="changes.html">changes.html</a></samp> file packaged with this
+system. </p>
+
+<H2>Usage</H2>
+
+<P> The basic usage of these routines works like this: </P>
+
+<PRE>
+use BER;
+require 'SNMP_Session.pm';
+
+# Set $host to the name of the host whose SNMP agent you want
+# to talk to.  Set $community to the community name under
+# which you want to talk to the agent.	Set port to the UDP
+# port on which the agent listens (usually 161).
+
+$session = SNMP_Session-&gt;open ($host, $community, $port)
+    or die "couldn't open SNMP session to $host";
+
+# Set $oid1, $oid2... to the BER-encoded OIDs of the MIB
+# variables you want to get.
+
+if ($session-&gt;get_request_response ($oid1, $oid2, ...)) {
+    ($bindings) = $session-&gt;decode_get_response ($session-&gt;{pdu_buffer});
+
+    while ($bindings ne '') {
+	($binding,$bindings) = &amp;decode_sequence ($bindings);
+	($oid,$value) = &amp;decode_by_template ($binding, "%O%@");
+	print &amp;pretty_print ($oid)," =&gt; ", &amp;pretty_print ($value), "\n";
+    }
+} else {
+    die "No response from agent on $host";
+}
+</PRE>
+
+<H2>Encoding OIDs</H2>
+
+<P> In order to BER-encode OIDs, you can use the function
+<B>BER::encode_oid</B>.  It takes (a vector of) numeric subids as an
+argument.  For example, </P>
+
+<PRE>
+use BER;
+encode_oid (1, 3, 6, 1, 2, 1, 1, 1, 0)
+</PRE>
+
+<P> will return the BER-encoded OID for the <B>sysDescr.0</B>
+ (1.3.6.1.2.1.1.1.0) instance of <A
+ HREF="ftp://ftp.isi.edu/in-notes/rfc1213.txt">MIB-2</A>. </P>
+
+<H2>Decoding the results</H2>
+
+<P> When get_request_response returns success, you must decode the
+ response PDU from the remote agent.  The function
+ <B>decode_get_response</B> can be used to do this.  It takes a
+ get-response PDU, checks its syntax and returns the <EM>bindings</EM>
+ part of the PDU.  This is where the remote agent actually returns the
+ values of the variables in your query. </P>
+
+<p> You should iterate over the individual bindings in this
+ <EM>bindings</EM> part and extract the value for each variable.  In
+ the example above, the returned bindings are simply printed using the
+ <B>BER::pretty_print</B> function. </p>
+
+<p> For better readability of the OIDs, you can also use the following
+ idiom, where the <samp>%pretty_oids</samp> hash maps BER-encoded
+ numerical OIDs to symbolic OIDs.  Note that this simple-minded
+ mapping only works for response OIDs that exactly match known OIDs,
+ so it's unsuitable for table walking (where the response OIDs include
+ an additional row index). </p>
+
+<pre>
+<font color="#c00000">%ugly_oids = qw(sysDescr.0	1.3.6.1.2.1.1.1.0
+		sysContact.0	1.3.6.1.2.1.1.4.0);
+foreach (keys %ugly_oids) {
+    $ugly_oids{$_} = encode_oid (split (/\./, $ugly_oids{$_}));
+    $pretty_oids{$ugly_oids{$_}} = $_;
+}</font>
+...
+if ($session-&gt;get_request_response ($ugly_oids{'sysDescr.0'},
+				    $ugly_oids{'sysContact.0'})) {
+    ($bindings) = $session-&gt;decode_get_response ($session-&gt;{pdu_buffer});
+    while ($bindings ne '') {
+	($binding,$bindings) = &amp;decode_sequence ($bindings);
+	($oid,$value) = &amp;decode_by_template ($binding, "%O%@");
+	print <font color="#c00000">$pretty_oids{$oid},</font>" =&gt; ",
+	      &amp;pretty_print ($value), "\n";
+    }
+} ...
+</pre>
+
+<H2><a name="set-req-use">Set Requests</a></H2>
+
+<p> Set requests are generated much like get or getNext requests are,
+ with the exception that you have to specify not just OIDs, but also
+ the values the variables should be set to.  Every binding is passed
+ as a reference to a two-element array, the first element being the
+ encoded OID and the second one the encoded value.  See the
+ <tt>test/set-test.pl</tt> script for an example, in particular the
+ subroutine <tt>snmpset</tt>. </p>
+
+<H2><a name="map-table-use">Walking Tables</a></H2>
+
+<p> Beginning with version 0.57 of <tt>SNMP_Session.pm</tt>, there is API
+ support for walking tables.  The <tt>map_table</tt> method can be
+ used for this as follows: </p>
+
+<pre>
+sub walk_function ($$$) {
+  my ($index, $val1, $val3) = @_;
+  ...
+}
+
+...
+$columns = [$base_oid1, $base_oid3];
+$n_rows = $session-&gt;map_table ($columns, \&amp;walk_function);
+</pre>
+
+<p> The <em>columns</em> argument must be a reference to a list of
+ OIDs for table columns sharing the same index.  The method will
+ traverse the table and call the <em>walk_function</em> for each row.
+ The arguments for these calls will be:
+
+<ol>
+
+<li> the <em>row index</em> as a partial OID in dotted notation,
+ e.g. "1.3", or "10.0.1.34".
+
+<li> the values of the requested table columns in that row, in
+ BER-encoded form.  If you want to use the standard
+ <tt>pretty_print</tt> subroutine to decode the values, you can use
+ the following idiom:
+
+<pre>
+  grep (defined $_ &amp;&amp; ($_=pretty_print $_), ($val1, $val3));
+</pre>
+
+</ol>
+
+<H3><a name="map-table-4-use">Walking Tables With
+<tt>get-bulk</tt></a></H3>
+
+<p> Since version 0.67, <tt>SNMP_Session</tt> uses a different
+<tt>get_table</tt> implementation for <tt>SNMPv2c_Session</tt>s.  This
+version uses the ``powerful <tt>get-bulk</tt> operator'' to retrieve
+many table rows with each request.  In general, this will make table
+walking much faster under SNMPv2c, especially when round-trip times to
+the agent are long. </p>
+
+<p> There is one difficulty, however: With <tt>get-bulk</tt>, a
+management application can specify the maximum number of rows to
+return in a single response.  <tt>SNMP_Session.pm</tt> provides a new
+function, <tt>map_table_4</tt>, in which this <tt>maxRepetitions</tt>
+value can be specified explicitly. </p>
+
+<p> For maximum efficiency, it should be set to a value that is one
+greater than the number of rows in the table.  If it is smaller, then
+<tt>map_table</tt> will use more request/response cycles than
+necessary; if it is bigger, the agent will have to compute variable
+bindings beyond the end of the table (which <tt>map_table</tt> will
+throw away). </p>
+
+<p> Of course it is usually impossible to know the size of the table
+in advance.  If you don't specify <tt>maxRepetitions</tt> when walking
+a table, then <tt>map_table</tt> will use a per-session default
+(<tt>$session-&gt;default_max_repetitions</tt>).  The default value for
+this default is 12. </p>
+
+<p> If you walk a table multiple times, and the size of the table is
+relatively stable, you should use the return value of
+<tt>map_table</tt> (which is the number of rows it has encountered) to
+compute the next value of <tt>maxRepetitions</tt>.  Remember to add
+one so that <tt>map_table</tt> notices when the table is finished!
+</p>
+
+<p> Note that for really big tables, this doesn't make a big
+difference, since the table won't fit in a single response packet
+anyway. </p>
+
+<H2><a name="trap-send">Sending Traps</a></H2>
+
+<p> To send a trap, you have to open an SNMP session to the trap
+ receiver.  Usually this is a process listening to UDP port 162 on a
+ network management station.  Then you can use the
+ <tt>trap_request_send</tt> method to encode and send SNMPv1 traps.
+ There is no way to find out whether the trap was actually received at
+ the management station - SNMP traps are fundamentally unreliable.
+</p>
+
+<p> When constructing an SNMPv1 trap, you must provide
+
+<ul>
+
+<li> the "enterprise" Object Identifier for the entity that generates
+ the trap
+
+<li> your IP address
+
+<li> the generic trap type
+
+<li> the specific trap type
+
+<li> the sysUpTime at the time of trap generation
+
+<li> a sequence (may be empty) of variable bindings further describing 
+ the trap.
+
+</ul>
+
+<p> For SNMPv2 traps, you need:
+
+<ul>
+
+<li> the trap's OID
+
+<li> the sysUpTime at the time of trap generation
+
+<li> the bindings list as above
+
+</ul>
+
+<p> For SNMPv2 traps, the uptime and trap OID are encoded as bindings
+which are added to the front of the other bindings you provide. </p>
+
+<p> Here is a short example: </p>
+
+<pre>
+my $trap_receiver = "netman.noc";
+my $trap_community = "SNMP_Traps";
+my $trap_session = $version eq '1'
+    ? SNMP_Session-&gt;open ($trap_receiver, $trap_community, 162)
+    : SNMPv2c_Session-&gt;open ($trap_receiver, $trap_community, 162);
+my $myIpAddress = ...;
+my $start_time = time;
+
+...
+
+sub link_down_trap ($$) {
+  my ($if_index, $version) = @_;
+  my $genericTrap = 2;		# linkDown
+  my $specificTrap = 0;
+  my @ifIndexOID = ( 1,3,6,1,2,1,2,2,1,1 );
+  my $upTime = int ((time - $start_time) * 100.0);
+  my @myOID = ( 1,3,6,1,4,1,2946,0,8,15 );
+
+  warn "Sending trap failed"
+    unless ($version eq '1')
+	? $trap_session-&gt;trap_request_send (encode_oid (@myOID),
+					    encode_ip_address ($myIpAddress),
+					    encode_int ($genericTrap),
+					    encode_int ($specificTrap),
+					    encode_timeticks ($upTime),
+					    [encode_oid (@ifIndex_OID,$if_index),
+					     encode_int ($if_index)],
+					    [encode_oid (@ifDescr_OID,$if_index),
+					     encode_string ("foo")])
+	    : $trap_session-&gt;v2_trap_request_send (\@linkDown_OID, $upTime,
+						   [encode_oid (@ifIndex_OID,$if_index),
+						    encode_int ($if_index)],
+						   [encode_oid (@ifDescr_OID,$if_index),
+						    encode_string ("foo")]);
+}
+</pre>
+
+<H2><a name="trap-recv">Receiving Traps</a></H2>
+
+<p> Since version 0.60, SNMP_Session.pm supports the receipt and
+ decoding of SNMPv1 trap requests.  Since version 0.75, SNMPv2 Trap
+ PDUs are also recognized. </p>
+
+<p> To receive traps, you have to create a special SNMP session that
+ passively listens on the SNMP trap transport address (usually UDP
+ port 162).  Then you can receive traps (actually, SNMPv1 traps,
+ SNMPv2 traps, and SNMPv2 informs) using the <tt>receive_trap</tt>
+ method and decode them using <tt>decode_trap_request</tt>.  The
+ <em>enterprise</em>, <em>agent</em>, <em>generic</em>,
+ <em>specific</em> and <em>sysUptime</em> return values are only
+ defined for SNMPv1 traps.  In SNMPv2 traps and informs, the
+ equivalent information is contained in the bindings.
+</p>
+
+<pre>
+my $trap_session = SNMPv1_Session-&gt;open_trap_session ()
+  or die "cannot open trap session";
+my ($trap, $sender_addr, $sender_port) = $trap_session-&gt;receive_trap ()
+  or die "cannot receive trap";
+my ($community, $enterprise, $agent,
+    $generic, $specific, $sysUptime, $bindings)
+  = $trap_session-&gt;decode_trap_request ($trap)
+    or die "cannot decode trap received"
+...
+my ($binding, $oid, $value);
+while ($bindings ne '') {
+    ($binding,$bindings) = &amp;decode_sequence ($bindings);
+    ($oid, $value) = decode_by_template ($binding, "%O%@");
+    print BER::pretty_oid ($oid)," =&gt; ",pretty_print ($value),"\n";
+}
+</pre>
+
+<H2>Future Plans</H2>
+
+<H3>SNMPv3 Support</H3>
+
+<P> The code could first be restructured to follow the modularization
+ proposed in <a
+ href="ftp://sunsite.cnlab-switch.ch/doc/standard/rfc/22xx/2271">RFC
+ 2271</a> (An Architecture for Describing SNMP Management Frameworks).
+ The existing SNMPv1 and SNMPv2c support must somehow be retrofitted
+ to this framework.  Later, one could add support for SNMPv3 PDU
+ formats and for user-based security. </p>
+
+<H3>Higher-Level APIs</H3>
+
+<P> The current programming interface is very close to the level of
+ SNMP operations and PDUs.  For actual management applications, there
+ are probably more convenient interfaces that could be defined. </P>
+
+<HR>
+<ADDRESS>
+<!-- hhmts start -->
+20080402
+<!-- hhmts end -->
+<A HREF="http://www.switch.ch/misc/leinen/">
+ Simon Leinen &lt;simon.leinen@switch.ch&gt;</A>
+
+<A HREF="http://validator.w3.org/"><IMG ALIGN=RIGHT BORDER=0
+     SRC="http://www.switch.ch/misc/leinen/images/vh40.gif"
+     ALT="Valid HTML 4.0!" HEIGHT=31 WIDTH=88></A>
+
+</ADDRESS>
+
+</BODY>
+</HTML>
