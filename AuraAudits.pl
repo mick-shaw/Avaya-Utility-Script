@@ -8,21 +8,33 @@ use Getopt::Long;
 use Pod::Usage;
 use Net::Nslookup;
 use Net::MAC;
+use Data::Dumper;
 
 ###########################################################
 #
-# Author: Mick Shaw
-# Company: Potomac Integration and Consulting
-#
-# Voice Mail Migration Report
-#
-# This script will read-in a csv file of a list of extensions
-# it will then modify the coverage path of the list of extension
-# 
+# 11/17 - Left off with this issue:
+# TODO: The last element is reversed when the hash-references
+#		are pushed to the @DisconnectedEndpoints array as the
+#		data-dumper output shows below
 #
 #
+# After push (should contain 1 element): 
+# $VAR1 = 'out-of-service';
+# $VAR2 = '2001';
+# $VAR3 = 'S00002';
+# $VAR4 = '9640';
 #
+# After push (should contain 1 element): 
+# $VAR1 = 'S00005';
+# $VAR2 = '2002';
+# $VAR3 = '9640';
+# $VAR4 = 'out-of-service';
 #
+# After push (should contain 1 element): 
+# $VAR1 = '9641SIP';
+# $VAR2 = '2004';
+# $VAR3 = 'S00007';
+# $VAR4 = 'out-of-service';
 #
 #
 ###########################################################
@@ -84,7 +96,7 @@ my $PBXDisplayStation_VoiceMailButton = '801f063d';
 sub getDisconnectedEndpoints
 {
 	
-	#my @DisconnectedEndpoints = ();
+	my @DisconnectedEndpoints = ();
     
 		my ($node, $ext) = @_;
 
@@ -99,15 +111,15 @@ sub getDisconnectedEndpoints
 					if ($hash_ref->{$PBXStatusStation_ServiceState} eq 'disconnected' or $hash_ref->{$PBXStatusStation_ServiceState} eq 'out-of-service')
 					{
 					
-					print $hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n";
-						#push (@DisconnectedEndpoints, values $hash_ref);
-
-					return;
+					#print $hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n";
+					push (@DisconnectedEndpoints, values $hash_ref);	
+					print "After push (should contain 1 element): \n" . Dumper(@DisconnectedEndpoints) . "\n";
+					return @DisconnectedEndpoints;
 					}
 			return;
 			}
-	return #@DisconnectedEndpoints;
-}
+	return 
+} 
 
 
 sub getListStations
@@ -135,8 +147,8 @@ foreach $phone (getListStations($node))
 {
 	
 	#print $phone->{$PBXListStation_Extension}.",";
-	
-	getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});	
+	print getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});
+	print "\n"	
 		
 }
 
