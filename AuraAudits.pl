@@ -84,10 +84,7 @@ my $PBXDisplayStation_VoiceMailButton = '801f063d';
 sub getDisconnectedEndpoints
 {
 	
-	
-	
-    
-	#my @DisconnectedEndpoints;
+	#my @DisconnectedEndpoints = ();
     
 		my ($node, $ext) = @_;
 
@@ -102,9 +99,10 @@ sub getDisconnectedEndpoints
 					if ($hash_ref->{$PBXStatusStation_ServiceState} eq 'disconnected' or $hash_ref->{$PBXStatusStation_ServiceState} eq 'out-of-service')
 					{
 					
-						#print $hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n";
-						#push (@DisconnectedEndpoints, $output);
-					return  (\%FIDS);
+					print $hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n";
+						#push (@DisconnectedEndpoints, values $hash_ref);
+
+					return;
 					}
 			return;
 			}
@@ -138,7 +136,7 @@ foreach $phone (getListStations($node))
 	
 	#print $phone->{$PBXListStation_Extension}.",";
 	
-	print getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});	
+	getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});	
 		
 }
 
