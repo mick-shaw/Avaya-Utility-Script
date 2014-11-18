@@ -143,7 +143,7 @@ sub getDisconnectedEndpoints
 					
 					#print $hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n";
 					push (@DisconnectedEndpoints, values $hash_ref);	
-					print "ossi_output Array looks like: \n" . Dumper($hash_ref) . "\n";
+					print "After push (should contain 1 element): \n" . Dumper($hash_ref) . "\n";
 					return @DisconnectedEndpoints;
 					}
 			return;
