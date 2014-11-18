@@ -13,9 +13,10 @@ use Data::Dumper;
 ###########################################################
 #
 # 11/17 - Left off with this issue:
-# TODO: The last element is reversed when the hash-references
-#		are pushed to the @DisconnectedEndpoints array as the
-#		data-dumper output shows below
+# TODO: The @ossi_output is an array of hashes.
+#	    When the values are pushed to @DisconnectedEndpoints 
+#		They ae in random order. I need to figue out how 
+#		to sort the array by the hash-references/keys.
 #
 # Here's a data dump of the @ossi_output array data elements.
 # @ossi_output Array data element looks like: 
@@ -142,7 +143,8 @@ sub getDisconnectedEndpoints
 					{
 					
 					#print $hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n";
-					push (@DisconnectedEndpoints, values $hash_ref);	
+					push (@DisconnectedEndpoints, values $hash_ref);
+
 					print "After push (should contain 1 element): \n" . Dumper($hash_ref) . "\n";
 					return @DisconnectedEndpoints;
 					}
