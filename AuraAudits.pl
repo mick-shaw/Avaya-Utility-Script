@@ -17,13 +17,43 @@ use Data::Dumper;
 #		are pushed to the @DisconnectedEndpoints array as the
 #		data-dumper output shows below
 #
+# Here's a data dump of the @ossi_output array data elements.
+# @ossi_output Array data element looks like: 
+# $VAR1 = {
+#           '0002ff00' => '2001',
+#           '0003ff00' => 'S00002',
+#           '0001ff00' => '9640',
+#           '0004ff00' => 'out-of-service'
+#         };
+
+
+# @ossi_output Array data element looks like: 
+# $VAR1 = {
+#           '0004ff00' => 'out-of-service',
+#           '0003ff00' => 'S00005',
+#           '0001ff00' => '9640',
+#           '0002ff00' => '2002'
+#         };
+
+
+
+# ossi_output Array data element looks like: 
+# $VAR1 = {
+#           '0002ff00' => '2004',
+#           '0001ff00' => '9641SIP',
+#           '0003ff00' => 'S00007',
+#           '0004ff00' => 'out-of-service'
+#         };
+
+#############################################################
+# Here's the output of the @DisconnectedEndpoints after the push
 #
 # After push (should contain 1 element): 
 # $VAR1 = 'out-of-service';
 # $VAR2 = '2001';
 # $VAR3 = 'S00002';
 # $VAR4 = '9640';
-#
+
 # After push (should contain 1 element): 
 # $VAR1 = 'S00005';
 # $VAR2 = '2002';
@@ -113,7 +143,7 @@ sub getDisconnectedEndpoints
 					
 					#print $hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n";
 					push (@DisconnectedEndpoints, values $hash_ref);	
-					print "After push (should contain 1 element): \n" . Dumper(@DisconnectedEndpoints) . "\n";
+					print "ossi_output Array looks like: \n" . Dumper($hash_ref) . "\n";
 					return @DisconnectedEndpoints;
 					}
 			return;
