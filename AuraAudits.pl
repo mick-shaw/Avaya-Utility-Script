@@ -80,7 +80,7 @@ sub getDisconnectedEndpoints
 	my @DisconnectedEndpoints = ();
 	my $Single_DisconnectedEndpoint;
     
-		my ($node, $ext) = @_;
+    my ($node, $ext) = @_;
 
 		my %FIDS = ($PBXStatusStation_Extension => '',$PBXStatusStation_Port => '',$PBXStatusStation_ProgrammedType => '',$PBXStatusStation_ServiceState => '');
 	        $node->pbx_command("status station $ext", %FIDS );   
@@ -98,17 +98,14 @@ sub getDisconnectedEndpoints
 					$Single_DisconnectedEndpoint = ($hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n");
 					push (@DisconnectedEndpoints, $Single_DisconnectedEndpoint);
 					
-					return @DisconnectedEndpoints;
 					}
-			return;
-			}
-	return 
-} 
+			}	
+
+} return @DisconnectedEndpoints
 
 
 sub getListStations
 {
-
 	my($node) = @_;
 
 	my @station;
