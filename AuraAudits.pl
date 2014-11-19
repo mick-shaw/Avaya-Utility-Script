@@ -11,61 +11,11 @@ use Net::MAC;
 use Data::Dumper;
 
 ###########################################################
+# 11/18 Completed Disconnect Report routine
+#	TODO:  Add menu and continue to build report options
 #
-# 11/17 - Left off with this issue:
-# TODO: The @ossi_output is an array of hashes.
-#	    When the values are pushed to @DisconnectedEndpoints 
-#		They ae in random order. I need to figue out how 
-#		to sort the array by the hash-references/keys.
 #
-# Here's a data dump of the @ossi_output array data elements.
-# @ossi_output Array data element looks like: 
-# $VAR1 = {
-#           '0002ff00' => '2001',
-#           '0003ff00' => 'S00002',
-#           '0001ff00' => '9640',
-#           '0004ff00' => 'out-of-service'
-#         };
-
-
-# @ossi_output Array data element looks like: 
-# $VAR1 = {
-#           '0004ff00' => 'out-of-service',
-#           '0003ff00' => 'S00005',
-#           '0001ff00' => '9640',
-#           '0002ff00' => '2002'
-#         };
-
-
-
-# ossi_output Array data element looks like: 
-# $VAR1 = {
-#           '0002ff00' => '2004',
-#           '0001ff00' => '9641SIP',
-#           '0003ff00' => 'S00007',
-#           '0004ff00' => 'out-of-service'
-#         };
-
-#############################################################
-# Here's the output of the @DisconnectedEndpoints after the push
 #
-# After push (should contain 1 element): 
-# $VAR1 = 'out-of-service';
-# $VAR2 = '2001';
-# $VAR3 = 'S00002';
-# $VAR4 = '9640';
-
-# After push (should contain 1 element): 
-# $VAR1 = 'S00005';
-# $VAR2 = '2002';
-# $VAR3 = '9640';
-# $VAR4 = 'out-of-service';
-#
-# After push (should contain 1 element): 
-# $VAR1 = '9641SIP';
-# $VAR2 = '2004';
-# $VAR3 = 'S00007';
-# $VAR4 = 'out-of-service';
 #
 #
 ###########################################################
@@ -128,24 +78,26 @@ sub getDisconnectedEndpoints
 {
 	
 	my @DisconnectedEndpoints = ();
+	my $Single_DisconnectedEndpoint;
     
 		my ($node, $ext) = @_;
 
-		my %FIDS = ($PBXStatusStation_Extension => '',$PBXStatusStation_ProgrammedType => '',$PBXStatusStation_ServiceState => '',$PBXStatusStation_Port => '');
+		my %FIDS = ($PBXStatusStation_Extension => '',$PBXStatusStation_Port => '',$PBXStatusStation_ProgrammedType => '',$PBXStatusStation_ServiceState => '');
 	        $node->pbx_command("status station $ext", %FIDS );   
 			if ($node->last_command_succeeded())
 
 			{
 				my @ossi_output = $node->get_ossi_objects();
+			
 				my ($hash_ref) = $ossi_output[0];	
 						
 					if ($hash_ref->{$PBXStatusStation_ServiceState} eq 'disconnected' or $hash_ref->{$PBXStatusStation_ServiceState} eq 'out-of-service')
 					{
 					
-					#print $hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n";
-					push (@DisconnectedEndpoints, values $hash_ref);
-
-					print "After push (should contain 1 element): \n" . Dumper($hash_ref) . "\n";
+					
+					$Single_DisconnectedEndpoint = ($hash_ref->{$PBXStatusStation_Extension}.",".$hash_ref->{$PBXStatusStation_Port}.",".$hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_ServiceState}."\n");
+					push (@DisconnectedEndpoints, $Single_DisconnectedEndpoint);
+					
 					return @DisconnectedEndpoints;
 					}
 			return;
@@ -170,19 +122,28 @@ sub getListStations
 	return @station;
 }
 
+sub runDisconnectReport
+{
 $node = new cli_ossi($pbx, $debug);
 unless( $node && $node->status_connection() ) {
    die("ERROR: Login failed for ". $node->get_node_name() );
 }
+print "Extension, Port, Station-Type, Service-State\n";
 
 foreach $phone (getListStations($node))
 {
 	
-	#print $phone->{$PBXListStation_Extension}.",";
-	print getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});
-	print "\n"	
+	print getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});	
 		
 }
 
 $node->do_logoff();
+
+}
+
+runDisconnectReport();
+
+
+
+
 
