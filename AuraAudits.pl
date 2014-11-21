@@ -4,22 +4,43 @@ use strict;
 require "./cli_ossi.pm";
 import cli_ossi;
 
+##########################################################
+# 11/19 Added menu
+#	TODO:  Add Mac-Address Report subroutines
+#
+#
+#
+#
+#
+###########################################################
+###########################################################
+# SNMP LIBRARY
+# The following modules should not be confused with the
+#SNMP modues perl modules found in CPAN (i.e. Net::SNMP).
+# These modules were previously maintained
+# by http://www.switch.ch/misc/leinen/snmp/perl/ They are now
+# publicly available on code.google.com/p/snmp-session
+# The entire package which includes all three modules can be downloaded
+# modules can be downloaded from
+# https://snmp-session.googlecode.com/files/SNMP_Session-1.13.tar.gz
+use lib './SNMP_Session-1.13/lib';
+use BER;
+use SNMP_util;
+use SNMP_Session;
+#############################################################
 use Getopt::Long;
 use Pod::Usage;
 use Net::Nslookup;
 use Net::MAC;
 use Data::Dumper;
 
-###########################################################
-# 11/18 Completed Disconnect Report routine
-#	TODO:  Add menu and continue to build report options
 #
-#
-#
-#
-#
-###########################################################
-
+#############################################################
+# SNMPSTRING
+# The $snmp_ro variable needs to be set to the SNMPSTRING which
+# is defined in the Avaya 46xxsettings.txt file
+my $snmp_ro = 'avaya_ro';
+#############################################################
 
 my $pbx = 'micklabs'; #'ojs'; #'rvs'; #'ouc2'; #'ouc1';#'pscc';'hsema'
 
@@ -62,6 +83,8 @@ my $PBXStatusStation_ConnectedType = 	'6a02ff00';
 my $PBXStatusStation_MacAddress = 		'6e00ff00';
 my $PBXStatusStation_ServiceState = 	'0004ff00';
 my $PBXStatusStation_Port = 			'0003ff00';
+my $PBXStatusStation_IPAddress = 		'6603ff00';
+my $PBXStatusStation_Firmware = 		'6d00ff00';
 
 my $PBXListStation_Extension 	= 		'8005ff00';
 my $PBXListStation_StationType	= 		'004fff00';
@@ -113,6 +136,27 @@ sub getDisconnectedEndpoints
 
 } 
 
+sub getPhoneFields
+{
+	my ($node, $ext) = @_;
+	
+		my %FIDS = ($PBXStatusStation_ProgrammedType => '',$PBXStatusStation_IPAddress =>'', $PBXStatusStation_ServiceState => '', $PBXStatusStation_ConnectedType => '', $PBXStatusStation_MacAddress => '', $PBXStatusStation_Firmware => '');
+			$node->pbx_command("status station $ext", %FIDS );
+			if ($node->last_command_succeeded())
+	
+			{
+	
+				my @ossi_output = $node->get_ossi_objects();
+				my $hash_ref = $ossi_output[0];
+				
+				print $hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_IPAddress}.",".$hash_ref->{$PBXStatusStation_ServiceState}.",".$hash_ref->{$PBXStatusStation_ConnectedType}.",".$hash_ref->{$PBXStatusStation_MacAddress}.",".$hash_ref->{$PBXStatusStation_Firmware}."\n";
+			}	
+	return;
+
+}
+
+
+
 sub getListStations
 {
 	my($node) = @_;
@@ -161,8 +205,9 @@ return '';
 
 sub MENU_DISC_OPT {
 print "\n Disconnect Report\n";
-print 'Email addresses: ';
+print 'Enter Email addresses (separated by commas): ';
 chomp($emailaddresses = <STDIN>);
+print 'Are the following addresses correct(y/n)?:<\n'.$emailaddresses.'>';
 
 return 'RUN_DISC_REPORT'
 }
