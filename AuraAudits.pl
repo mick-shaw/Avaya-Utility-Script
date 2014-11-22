@@ -53,10 +53,8 @@ my $phone;
 my $choice;
 my $emailaddresses;
 my $voipphone;
-my $PBXgetIPaddress;
 my $serialnumber;
 my $PhoneFields;
-my $PBXgetExtension;
 
 ###########################################################
 #
