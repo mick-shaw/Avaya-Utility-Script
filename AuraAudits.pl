@@ -52,6 +52,11 @@ my $node;
 my $phone;
 my $choice;
 my $emailaddresses;
+my $voipphone;
+my $PBXgetIPaddress;
+my $serialnumber;
+my $PhoneFields;
+my $PBXgetExtension;
 
 ###########################################################
 #
@@ -90,8 +95,15 @@ my $PBXListStation_Extension 	= 		'8005ff00';
 my $PBXListStation_StationType	= 		'004fff00';
 my $PBXListStation_CoveragePath	= 		'004fff00';
 
+my $PBXListRegistered_IPAddress =		'6d03ff00';
+my $PBXListRegistered_Extension =		'6800ff00';
+
 my $PBXDisplayStation_CoveragePath = 	'8007ff00';
 my $PBXDisplayStation_VoiceMailButton = '801f063d';
+
+my $AvayaOIDSN_01 = "1.3.6.1.4.1.6889.2.69.2.1.46.0";
+my $AvayaOIDSN_02 = "1.3.6.1.4.1.6889.2.69.5.1.79.0";
+my $Object_Value;
 
 our %CMD_FN_MAP =(
 MENU_MAIN => \&MENU_MAIN, #
@@ -113,14 +125,14 @@ sub getDisconnectedEndpoints
 	my $Single_DisconnectedEndpoint;
     
     my ($node, $ext) = @_;
-
-		my %FIDS = ($PBXStatusStation_Extension => '',$PBXStatusStation_Port => '',$PBXStatusStation_ProgrammedType => '',$PBXStatusStation_ServiceState => '');
-	        $node->pbx_command("status station $ext", %FIDS );   
-			if ($node->last_command_succeeded())
+	my %FIDS = ($PBXStatusStation_Extension => '',$PBXStatusStation_Port => '',$PBXStatusStation_ProgrammedType => '',$PBXStatusStation_ServiceState => '');
+	        
+	$node->pbx_command("status station $ext", %FIDS );   
+			
+		if ($node->last_command_succeeded())
 
 			{
 				my @ossi_output = $node->get_ossi_objects();
-			
 				my ($hash_ref) = $ossi_output[0];	
 						
 					if ($hash_ref->{$PBXStatusStation_ServiceState} eq 'disconnected' or $hash_ref->{$PBXStatusStation_ServiceState} eq 'out-of-service')
@@ -130,31 +142,72 @@ sub getDisconnectedEndpoints
 					push (@DisconnectedEndpoints, $Single_DisconnectedEndpoint);
 					
 					}
-			}
+			}return @DisconnectedEndpoints;
 	
-	return @DisconnectedEndpoints;
-
 } 
 
 sub getPhoneFields
 {
-	my ($node, $ext) = @_;
 	
-		my %FIDS = ($PBXStatusStation_ProgrammedType => '',$PBXStatusStation_IPAddress =>'', $PBXStatusStation_ServiceState => '', $PBXStatusStation_ConnectedType => '', $PBXStatusStation_MacAddress => '', $PBXStatusStation_Firmware => '');
-			$node->pbx_command("status station $ext", %FIDS );
-			if ($node->last_command_succeeded())
+	my $Single_IPEndpoint;
+
+	my ($node, $ext) = @_;
+	my %FIDS = ($PBXStatusStation_ProgrammedType => '',$PBXStatusStation_IPAddress =>'', $PBXStatusStation_ServiceState => '', $PBXStatusStation_ConnectedType => '', $PBXStatusStation_MacAddress => '', $PBXStatusStation_Firmware => '');
+	
+	$node->pbx_command("status station $ext", %FIDS );
+		
+		if ($node->last_command_succeeded())
 	
 			{
 	
 				my @ossi_output = $node->get_ossi_objects();
 				my $hash_ref = $ossi_output[0];
 				
-				print $hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_IPAddress}.",".$hash_ref->{$PBXStatusStation_ServiceState}.",".$hash_ref->{$PBXStatusStation_ConnectedType}.",".$hash_ref->{$PBXStatusStation_MacAddress}.",".$hash_ref->{$PBXStatusStation_Firmware}."\n";
-			}	
-	return;
+				$Single_IPEndpoint = ($hash_ref->{$PBXStatusStation_ProgrammedType}.",".$hash_ref->{$PBXStatusStation_IPAddress}.",".$hash_ref->{$PBXStatusStation_ServiceState}.",".$hash_ref->{$PBXStatusStation_ConnectedType}.",".$hash_ref->{$PBXStatusStation_MacAddress}.",".$hash_ref->{$PBXStatusStation_Firmware}."\n");
+			} 
+			return $Single_IPEndpoint;	
+	
 
 }
 
+sub getserialnum {
+	
+	my ($node) = @_;
+	
+	($Object_Value) = &snmpget("$snmp_ro\@$node","$AvayaOIDSN_02");
+	
+	if ($Object_Value) { 
+
+		return "$Object_Value"; }
+		
+		else{ ($Object_Value) = &snmpget("$snmp_ro\@$node","$AvayaOIDSN_01");
+			
+			if ($Object_Value) {
+
+				 return "$Object_Value"; }
+
+				else {
+
+					return "No response from host :$node"; }
+
+		return;
+	}
+}
+
+sub getRegisteredPhones
+{
+	my($node) = @_;
+	my @registered;
+	
+	$node->pbx_command("list registered");
+		if ( $node->last_command_succeeded() ) {
+		
+		@registered= $node->get_ossi_objects();
+		
+	}
+	
+	return @registered;
+}
 
 
 sub getListStations
@@ -171,6 +224,37 @@ sub getListStations
 
 	return @station;
 }
+
+sub runIPEndPointReport
+{
+
+$node = new cli_ossi($pbx, $debug);
+	unless( $node && $node->status_connection() ) {
+		die("ERROR: Login failed for ". $node->get_node_name() );
+	}
+	# Print out CSV column headers.
+	print "Extension,Serial Number,Programmed Set Type,IP Address,Service State,Connected Set Type,MAC Address,Firmware"."\n";
+	
+	
+	foreach $voipphone (getRegisteredPhones($node))
+	{
+		# Exclude any adresses - For example, I don't want the Avaya AES.
+			if ($voipphone->{$PBXListRegistered_IPAddress} !~ /^10\.88\.1\.36/)
+			{
+				$serialnumber = getserialnum($voipphone->{$PBXListRegistered_IPAddress});
+				$PhoneFields =getPhoneFields($node,$voipphone->{$PBXListRegistered_Extension});
+
+				print $voipphone->{$PBXListRegistered_Extension}.",";
+				print $serialnumber.",";
+				print $PhoneFields;
+
+			}
+	}
+
+$node->do_logoff();
+
+}
+
 
 sub runDisconnectReport
 {
@@ -230,15 +314,15 @@ return 'RUN_IPENDPT_REPORT'
 sub FN_RUN_IPENDPT_REPORT
 {
 print "\nYour IP-Endpoint report is running \n";
+runIPEndPointReport();
 return '';
 }
+
 my $next = MENU_MAIN();
-while (1)
-{
-exit if !$next;
-die if !exists $CMD_FN_MAP{uc($next)};
-$next = &{$CMD_FN_MAP{uc($next)}}();
-} 
-
-
+	while (1)
+	{
+		exit if !$next;
+		die if !exists $CMD_FN_MAP{uc($next)};
+		$next = &{$CMD_FN_MAP{uc($next)}}();
+	} 
 
