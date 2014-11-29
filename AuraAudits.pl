@@ -5,8 +5,17 @@ require "./cli_ossi.pm";
 import cli_ossi;
 
 ##########################################################
-# 11/19 Added menu
-#	TODO:  Add Mac-Address Report subroutines
+# 11/29 Added file handlers to write reports and created a 
+# a sendattachment routine to email the completed report.
+#	
+# 	TODO:  Expand email routine to allow for mulitple
+#		   recepients
+#		   
+#		   Create More useful Utilities
+#		   Possibilities are:
+#		   - VoiceMail migration tool
+#		   - Uniform DialPlan Evaluation
+#
 #
 #
 #
@@ -24,6 +33,10 @@ import cli_ossi;
 # modules can be downloaded from
 # https://snmp-session.googlecode.com/files/SNMP_Session-1.13.tar.gz
 use lib './SNMP_Session-1.13/lib';
+
+# Local library
+use lib './Otherlibs';
+
 use BER;
 use SNMP_util;
 use SNMP_Session;
@@ -33,6 +46,10 @@ use Pod::Usage;
 use Net::Nslookup;
 use Net::MAC;
 use Data::Dumper;
+use Time::localtime;
+use Mail::Send;
+use MIME::Lite;
+
 
 #
 #############################################################
@@ -51,7 +68,7 @@ my $help =0;
 my $node;
 my $phone;
 my $choice;
-my $emailaddresses;
+our $emailaddresses;
 my $voipphone;
 my $serialnumber;
 my $PhoneFields;
@@ -103,6 +120,12 @@ my $AvayaOIDSN_01 = "1.3.6.1.4.1.6889.2.69.2.1.46.0";
 my $AvayaOIDSN_02 = "1.3.6.1.4.1.6889.2.69.5.1.79.0";
 my $Object_Value;
 
+my $DisconnectReport = '' . timestamp() . '-DisconnectReport.csv';
+my $IPEndpointReport = '' . timestamp() . '-IPEndpointReport.csv';
+
+my $data;
+my $msg;
+
 our %CMD_FN_MAP =(
 MENU_MAIN => \&MENU_MAIN, #
 
@@ -115,6 +138,40 @@ RUN_IPENDPT_REPORT => \&FN_RUN_IPENDPT_REPORT, #
 
 ###########################################################
 
+
+sub timestamp {
+  my $t = localtime;
+  return sprintf( "%04d-%02d-%02d_%02d-%02d-%02d",
+                  $t->year + 1900, $t->mon + 1, $t->mday,
+                  $t->hour, $t->min, $t->sec );
+}
+
+sub sendAttachment
+{
+   my( $from, $to, $subject, $filename, $data ) = @_;
+
+
+$msg = MIME::Lite->new(
+                 From     => $from,
+                 To       => $to,
+                 Subject  => $subject,
+                 Type     => 'multipart/mixed'
+                 );
+                 
+# Add your text message.
+$msg->attach(Type         => 'text',
+             Data         => $data 
+            );
+            
+# Specify your file as attachement.
+$msg->attach(Encoding 	 => '8bit',
+			 Type        => 'text/csv', 
+             Path        => './' . $filename,
+             Filename    => $filename,
+             Disposition => 'attachment'
+            );       
+$msg->send;
+}
 
 sub getDisconnectedEndpoints
 {
@@ -231,7 +288,9 @@ $node = new cli_ossi($pbx, $debug);
 		die("ERROR: Login failed for ". $node->get_node_name() );
 	}
 	# Print out CSV column headers.
-	print "Extension,Serial Number,Programmed Set Type,IP Address,Service State,Connected Set Type,MAC Address,Firmware"."\n";
+	open(my $fh, '>', $IPEndpointReport) or die "Could not open file '$IPEndpointReport' $!";
+
+	print $fh "Extension,Serial Number,Programmed Set Type,IP Address,Service State,Connected Set Type,MAC Address,Firmware"."\n";
 	
 	
 	foreach $voipphone (getRegisteredPhones($node))
@@ -242,13 +301,13 @@ $node = new cli_ossi($pbx, $debug);
 				$serialnumber = getserialnum($voipphone->{$PBXListRegistered_IPAddress});
 				$PhoneFields =getPhoneFields($node,$voipphone->{$PBXListRegistered_Extension});
 
-				print $voipphone->{$PBXListRegistered_Extension}.",";
-				print $serialnumber.",";
-				print $PhoneFields;
+				print $fh $voipphone->{$PBXListRegistered_Extension}.",";
+				print $fh $serialnumber.",";
+				print $fh $PhoneFields;
 
 			}
 	}
-
+close	$fh;
 $node->do_logoff();
 
 }
@@ -256,71 +315,108 @@ $node->do_logoff();
 
 sub runDisconnectReport
 {
-$node = new cli_ossi($pbx, $debug);
-unless( $node && $node->status_connection() ) {
-   die("ERROR: Login failed for ". $node->get_node_name() );
-}
-print "Extension, Port, Station-Type, Service-State\n";
+	$node = new cli_ossi($pbx, $debug);
+	unless( $node && $node->status_connection() ) {
+	   die("ERROR: Login failed for ". $node->get_node_name() );
+		}
+		open(my $fh, '>', $DisconnectReport) or die "Could not open file '$DisconnectReport' $!";
 
-foreach $phone (getListStations($node))
-{
-	
-	print getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});	
-		
-}
-
-$node->do_logoff();
+		print $fh "Extension, Port, Station-Type, Service-State\n";
+			
+		foreach $phone (getListStations($node))
+		{
+			print $fh getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});	
+				
+		}
+	close	$fh;
+	$node->do_logoff();
 
 }
 
 sub MENU_MAIN {
-print "\n Aura Audit Report Menu \n";
-print "1. Disconnect Report\n";
-print "2. IP-Endpoint Report\n";
-print 'Your Audit Report choice ? ';
-chomp($choice = <STDIN>);
+	print "\n Aura Audit Report Menu \n";
+	print "1. Disconnect Report\n";
+	print "2. IP-Endpoint Report\n";
+	print 'Your Audit Report choice ? ';
+	chomp($choice = <STDIN>);
 
-return 'MENU_DISC_OPT' if $choice == 1;
-return 'MENU_IPENDPT_OPT' if $choice == 2;
-return '';
+	return 'MENU_DISC_OPT' if $choice == 1;
+	return 'MENU_IPENDPT_OPT' if $choice == 2;
+	
+	return '';
 }
 
 sub MENU_DISC_OPT {
-print "\n Disconnect Report\n";
-print 'Enter Email addresses (separated by commas): ';
-chomp($emailaddresses = <STDIN>);
-print 'Are the following addresses correct(y/n)?:<\n'.$emailaddresses.'>';
-
-return 'RUN_DISC_REPORT'
+	print "\n Disconnect Report\n";
+	print 'Enter an Email address to send the report: ';
+	chomp($emailaddresses = <STDIN>);
+	print '
+	The report will be sent to: [' . $emailaddresses . ']
+	Are the addresses above correct? (y/n):';
+	chomp($choice = <STDIN>);
+	return 'RUN_DISC_REPORT' if $choice eq 'y';
+	return 'MENU_DISC_OPT' if $choice eq 'n';
+	return 'MENU_MAIN';
+	
 }
 
 sub FN_RUN_DISC_REPORT
 {
-print "\nYour Disconnect report is running \n";
-runDisconnectReport();
-return '';
+	print "\nYour Disconnect report is running \n";
+	runDisconnectReport();
+	sendAttachment(
+	    'AuraAudits@potomacintegration.com>',
+	    $emailaddresses,
+	    'Disconnect Report',
+	    $DisconnectReport,
+	    'Your Disconnect Report is attached
+
+	    ',
+	    
+	);
+	return '';
 }
 
 sub MENU_IPENDPT_OPT {
-print "\n IP-Endpoint Report\n";
-print 'Email addresses: ';
-chomp($emailaddresses = <STDIN>);
-
-return 'RUN_IPENDPT_REPORT'
+	print "\n IP EndPoint Report\n";
+	print 'Enter an Email address to send the report: ';
+	chomp($emailaddresses = <STDIN>);
+	print '
+	The report will be sent to: [' . $emailaddresses . ']
+	Are the addresses above correct? (y/n):';
+	chomp($choice = <STDIN>);
+	return 'RUN_IPENDPT_REPORT' if $choice eq 'y';
+	return 'MENU_IPENDPT_OPT' if $choice eq 'n';
+	return 'MENU_MAIN';
+	
 }
+
+
 
 sub FN_RUN_IPENDPT_REPORT
 {
-print "\nYour IP-Endpoint report is running \n";
-runIPEndPointReport();
-return '';
+	print "\nYour IP-Endpoint report is running \n";
+
+	runIPEndPointReport();
+	sendAttachment(
+	    'AuraAudits@potomacintegration.com>',
+	    $emailaddresses,
+	    'IP-Endpoint Report',
+	    $IPEndpointReport,
+	    'Your IP-Endpoint Report is attached
+
+	    ',
+	    
+	);
+
+	return '';
 }
 
-my $next = MENU_MAIN();
-	while (1)
-	{
-		exit if !$next;
-		die if !exists $CMD_FN_MAP{uc($next)};
-		$next = &{$CMD_FN_MAP{uc($next)}}();
-	} 
 
+ my $next = MENU_MAIN();
+ 	while (1)
+ 	{
+ 		exit if !$next;
+ 		die if !exists $CMD_FN_MAP{uc($next)};
+ 		$next = &{$CMD_FN_MAP{uc($next)}}();
+ 	} 
