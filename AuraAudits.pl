@@ -7,15 +7,62 @@ import cli_ossi;
 ##########################################################
 # 			Aura Audit Utility 
 #
+# Author: Mick Shaw
+# Company: Potomac Integration and Consulting
+# Date: 12/19/2014
+#
+#
 #	A collection of report tools that are used for gathering
 #	information on Communication Manager instances
-#	
 #
+#
+# "$PBX" variable defines the CM instance. The connection
+#  details of each instance are defined in the OSSI
+#  Module (cli_ossi.pm).
+#
+# Note: If the $PBX variable changes, the OSSI Module must
+#       be updated as well
+#
+###########################################################
+# IP-Phone Report
+#
+# This report will run a list-registered command followed
+# by a status station command using the output of the
+# list-registered command.
+#
+#
+
+#
+# Note: 2420 Handsets registered as IP-Agents are excluded
+#
+#
+###########################################################
+# Disconnect Report
+#
+# This report will run a list station command followed
+# by a status station using the output of the
+# list station command
+#
+
 #
 #
 #
 #
 ###########################################################
+# Vector Messaging Report
+# 
+# This report will perform a list vector.  It will then
+# perform a display vector and iterate accross all 99
+# command steps.  if a message command is found it will
+# write the coresponding messaging split/hunt-group and the
+# corresponding extension associated with the messaging command
+#
+#
+#
+#
+#
+#
+#
 ###########################################################
 # SNMP LIBRARY
 # The following modules should not be confused with the
