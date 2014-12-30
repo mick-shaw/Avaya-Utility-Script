@@ -5,23 +5,64 @@ require "./cli_ossi.pm";
 import cli_ossi;
 
 ##########################################################
-# 11/29 Added file handlers to write reports and created a 
-# a sendattachment routine to email the completed report.
-#	
-# 	TODO:  Expand email routine to allow for mulitple
-#		   recepients
-#		   
-#		   Create More useful Utilities
-#		   Possibilities are:
-#		   - VoiceMail migration tool
-#		   - Uniform DialPlan Evaluation
+# 			Aura Audit Utility 
+#
+# Author: Mick Shaw
+# Company: Potomac Integration and Consulting
+# Date: 12/19/2014
 #
 #
+#	A collection of report tools that are used for gathering
+#	information on Communication Manager instances
+#
+#
+# "$PBX" variable defines the CM instance. The connection
+#  details of each instance are defined in the OSSI
+#  Module (cli_ossi.pm).
+#
+# Note: If the $PBX variable changes, the OSSI Module must
+#       be updated as well
+#
+###########################################################
+# IP-Phone Report
+#
+# This report will run a list-registered command followed
+# by a status station command using the output of the
+# list-registered command.
+#
+#
+
+#
+# Note: 2420 Handsets registered as IP-Agents are excluded
+#
+#
+###########################################################
+# Disconnect Report
+#
+# This report will run a list station command followed
+# by a status station using the output of the
+# list station command
+#
+
 #
 #
 #
 #
 ###########################################################
+# Vector Messaging Report
+# 
+# This report will perform a list vector.  It will then
+# perform a display vector and iterate accross all 99
+# command steps.  if a message command is found it will
+# write the coresponding messaging split/hunt-group and the
+# corresponding extension associated with the messaging command
+#
+#
+#
+#
+#
+#
+#
 ###########################################################
 # SNMP LIBRARY
 # The following modules should not be confused with the
@@ -97,6 +138,15 @@ my $PhoneFields;
 #	8007ff00 = Coverage Path
 #	801f063d = Voicemail Button
 #
+#	list vector FIDs
+#-------------------------------------------------
+#   
+#	0001ff01 = Vector number
+#	
+#
+#
+#
+#
 my $PBXStatusStation_Extension = 		'0002ff00';
 my $PBXStatusStation_ProgrammedType = 	'0001ff00';
 my $PBXStatusStation_ConnectedType = 	'6a02ff00';
@@ -116,24 +166,39 @@ my $PBXListRegistered_Extension =		'6800ff00';
 my $PBXDisplayStation_CoveragePath = 	'8007ff00';
 my $PBXDisplayStation_VoiceMailButton = '801f063d';
 
+my $PBXListVector_VectorNumber = 		'0001ff01';
+
+my $PBXDisplayVector_FIDSuffix;
+my $PBXDisplayVector_CommandFID;
+my $PBXDisplayVector_Command_ObjectFID;
+my $PBXDisplayVector_Command_QualifierFID;
+my $vectors;
+
+my $Temp_FIDSuffix = 0x01;
+my $VectorCounter01 = 0;
+my $VectorCounter02 = 0;
+
 my $AvayaOIDSN_01 = "1.3.6.1.4.1.6889.2.69.2.1.46.0";
 my $AvayaOIDSN_02 = "1.3.6.1.4.1.6889.2.69.5.1.79.0";
 my $Object_Value;
 
 my $DisconnectReport = '' . timestamp() . '-DisconnectReport.csv';
 my $IPEndpointReport = '' . timestamp() . '-IPEndpointReport.csv';
+my $MsgVectorReport = '' . timestamp() . '-MsgVectorReport.csv';
 
 my $data;
 my $msg;
 
 our %CMD_FN_MAP =(
 MENU_MAIN => \&MENU_MAIN, #
-
+REPORT_MAIN => \&REPORT_MAIN, #
 MENU_DISC_OPT => \&MENU_DISC_OPT, #
 MENU_IPENDPT_OPT => \&MENU_IPENDPT_OPT, #
+MENU_MSGVCTR_OPT => \&MENU_MSGVCTR_OPT, #
 
 RUN_DISC_REPORT => \&FN_RUN_DISC_REPORT, #
 RUN_IPENDPT_REPORT => \&FN_RUN_IPENDPT_REPORT, #
+RUN_MSGVCTR_REPORT => \&FN_RUN_MSGVCTR_REPORT, #
 );
 
 ###########################################################
@@ -171,6 +236,81 @@ $msg->attach(Encoding 	 => '8bit',
              Disposition => 'attachment'
             );       
 $msg->send;
+}
+
+sub getVectorFields
+{
+	my @MessageVectors = ();
+	my $Single_MessageVectors;
+
+	my ($node, $vectornumber) =@_;
+	my %fields =();
+
+
+	while ($VectorCounter01 < 99)
+	{
+
+	$PBXDisplayVector_FIDSuffix 	= sprintf ("%02x", $Temp_FIDSuffix++);
+	$PBXDisplayVector_CommandFID 	=  "0006ff".$PBXDisplayVector_FIDSuffix;
+	$PBXDisplayVector_Command_ObjectFID 	=  "0023ff".$PBXDisplayVector_FIDSuffix;
+	$PBXDisplayVector_Command_QualifierFID =  "0024ff".$PBXDisplayVector_FIDSuffix;
+
+	$fields {$PBXDisplayVector_CommandFID} = '';
+	$fields {$PBXDisplayVector_Command_ObjectFID} = '';
+	$fields {$PBXDisplayVector_Command_QualifierFID} = '';
+	$VectorCounter01++;
+	
+	}	
+	$node->pbx_command("display vector $vectornumber", %fields );
+        if ($node->last_command_succeeded())
+	{
+	my @ossi_output = $node->get_ossi_objects();
+	my $hash_ref = $ossi_output[0];	
+	
+        $Temp_FIDSuffix = 0x01;	
+	$VectorCounter02 = 0;
+	while ($VectorCounter02 < 99)
+	{
+        	
+	 $PBXDisplayVector_FIDSuffix = sprintf ("%02x", $Temp_FIDSuffix++);
+        $PBXDisplayVector_CommandFID =  "0006ff".$PBXDisplayVector_FIDSuffix;
+		#print Dumper ($hash_ref->{$PBXDisplayVector_CommandFID});
+		if (defined $hash_ref->{$PBXDisplayVector_CommandFID})
+		{
+			if ($hash_ref->{$PBXDisplayVector_CommandFID} eq 'messaging')
+			{
+	$PBXDisplayVector_Command_ObjectFID =  "0023ff".$PBXDisplayVector_FIDSuffix;
+	$PBXDisplayVector_Command_QualifierFID =  "0024ff".$PBXDisplayVector_FIDSuffix;		
+	
+	$Single_MessageVectors = ($vectornumber.",". $hash_ref->{$PBXDisplayVector_Command_ObjectFID}."," . $hash_ref->{$PBXDisplayVector_Command_QualifierFID} . "\n");
+	push (@MessageVectors, $Single_MessageVectors);
+	#print $vectornumber.",". $hash_ref->{$PBXDisplayVector_Command_ObjectFID}."," . $hash_ref->{$PBXDisplayVector_Command_QualifierFID} . "\n";
+
+			}
+		}	
+       	$VectorCounter02++;
+	}
+
+	
+	 
+	}return @MessageVectors;
+
+}
+
+sub getListVectors
+{
+
+        my($node) = @_;
+
+        my @vector;
+
+        $node->pbx_command("list vector");
+
+        if ( $node->last_command_succeeded() ) {
+                @vector= $node->get_ossi_objects();
+        }
+	
+        return @vector;
 }
 
 sub getDisconnectedEndpoints
@@ -291,6 +431,7 @@ $node = new cli_ossi($pbx, $debug);
 	open(my $fh, '>', $IPEndpointReport) or die "Could not open file '$IPEndpointReport' $!";
 
 	print $fh "Extension,Serial Number,Programmed Set Type,IP Address,Service State,Connected Set Type,MAC Address,Firmware"."\n";
+	print 	  "Extension,Serial Number,Programmed Set Type,IP Address,Service State,Connected Set Type,MAC Address,Firmware"."\n";
 	
 	
 	foreach $voipphone (getRegisteredPhones($node))
@@ -304,6 +445,9 @@ $node = new cli_ossi($pbx, $debug);
 				print $fh $voipphone->{$PBXListRegistered_Extension}.",";
 				print $fh $serialnumber.",";
 				print $fh $PhoneFields;
+				print $voipphone->{$PBXListRegistered_Extension}.",";
+				print $serialnumber.",";
+				print $PhoneFields;
 
 			}
 	}
@@ -322,10 +466,11 @@ sub runDisconnectReport
 		open(my $fh, '>', $DisconnectReport) or die "Could not open file '$DisconnectReport' $!";
 
 		print $fh "Extension, Port, Station-Type, Service-State\n";
-			
+		print 	  "Extension, Port, Station-Type, Service-State\n";	
 		foreach $phone (getListStations($node))
 		{
 			print $fh getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});	
+			print getDisconnectedEndpoints($node,$phone->{$PBXListStation_Extension});	
 				
 		}
 	close	$fh;
@@ -333,26 +478,139 @@ sub runDisconnectReport
 
 }
 
+sub runMessageVectorReport
+{
+	$node = new cli_ossi($pbx, $debug);
+	unless( $node && $node->status_connection() ) {
+	   die("ERROR: Login failed for ". $node->get_node_name() );
+		}
+		open(my $fh, '>', $MsgVectorReport) or die "Could not open file '$MsgVectorReport' $!";
+
+		print $fh "Vector, Messaging HuntGroup, Extension\n";
+		print 	  "Vector, Messaging HuntGroup, Extension\n";	
+		foreach $vectors (getListVectors($node))
+		{
+			print $fh getVectorFields($node,$vectors->{$PBXListVector_VectorNumber});	
+			print getVectorFields($node,$vectors->{$PBXListVector_VectorNumber});	
+				
+		}
+	close	$fh;
+	$node->do_logoff();
+
+}
 sub MENU_MAIN {
-	print "\n Aura Audit Report Menu \n";
-	print "1. Disconnect Report\n";
-	print "2. IP-Endpoint Report\n";
-	print 'Your Audit Report choice ? ';
+	print "\n\n";
+	print "    ************************************\n";
+	print "    *	  Aura Audit Report Menu       *\n";
+	print "    *	                               *\n";
+	print "    *	                               *\n";
+	
+	print "    ************************************\n";
+	print "\n\n";
+	print "    1. OJS\n";
+	print "    2. Reeves\n";
+	print "    3. OUC2\n";
+	print "    4. Mick Lab\n\n";
+	
+	print 'Select The switch to query: ';
+	chomp($choice = <STDIN>);
+	if ($choice == 1){
+		$pbx = 'ojs';
+		return 'REPORT_MAIN';
+	}
+		elsif ($choice == 2) {
+			$pbx = 'rvs';
+			return 'REPORT_MAIN';
+		} elsif ($choice == 3) {
+			$pbx = 'ouc2';
+			return 'REPORT_MAIN';
+		} else {
+			$pbx = 'micklabs';
+			return 'REPORT_MAIN';
+		
+	}
+
+	
+	return 'REPORT_MAIN';
+}
+
+sub REPORT_MAIN {
+	print "\n\n";
+	print "    ************************************\n";
+	print "    *	  Aura Audit Report Menu       *\n";
+	print "    *	                               *\n";
+	print "    *	                               *\n";
+	
+	print "    ************************************\n";
+	print "\n\n";
+	print "    1. Disconnect Report\n";
+	print "    2. IP-Endpoint Report\n";
+	print "    3. Message Vector Report\n\n";
+
+	print 'Select your Activity: ';
 	chomp($choice = <STDIN>);
 
 	return 'MENU_DISC_OPT' if $choice == 1;
 	return 'MENU_IPENDPT_OPT' if $choice == 2;
+	return 'MENU_MSGVCTR_OPT' if $choice == 3;
+
+	return '';
+}
+
+sub MENU_MSGVCTR_OPT {
+	print "\n\n";
+	print "    ************************************\n";
+	print "    *    Message Vector Report Menu     *\n";
+	print "    *	                               *\n";
+	print "    *	                               *\n";
 	
+	print "    ************************************\n";
+	print "\n\n";
+	print "Enter an Email address to send the report: ";
+	chomp($emailaddresses = <STDIN>);
+	print '
+	The report will be sent to: ';
+	print "[" . $emailaddresses . ']';
+	print "\n\nAre the addresses above correct? (y/n):";
+	chomp($choice = <STDIN>);
+	return 'RUN_MSGVCTR_REPORT' if $choice eq 'y';
+	return 'MENU_MSGVCTR_OPT' if $choice eq 'n';
+	return 'MENU_MAIN';
+	
+}
+
+sub FN_RUN_MSGVCTR_REPORT
+{
+	print "\nYour Message Vector report is running \n\n";
+	runMessageVectorReport();
+	sendAttachment(
+	    'AuraAudits@potomacintegration.com>',
+	    $emailaddresses,
+	    'Message Vector Report',
+	    $MsgVectorReport,
+	    'Your Message Vector Report is attached
+
+	    ',
+	);
+	print "\n\nReport "."[".$MsgVectorReport."]"." is complete!\n\n"; 
 	return '';
 }
 
 sub MENU_DISC_OPT {
-	print "\n Disconnect Report\n";
-	print 'Enter an Email address to send the report: ';
+	print "\n\n";
+	print "    ************************************\n";
+	print "    *	  Disconnect Report Menu       *\n";
+	print "    *	                               *\n";
+	print "    *	                               *\n";
+	
+	print "    ************************************\n";
+	print "\n\n";
+	print "Enter an Email address to send the report: ";
 	chomp($emailaddresses = <STDIN>);
 	print '
-	The report will be sent to: [' . $emailaddresses . ']
-	Are the addresses above correct? (y/n):';
+	The report will be sent to: ';
+	print "[" . $emailaddresses . ']';
+	print "\n\nAre the addresses above correct? (y/n):";
 	chomp($choice = <STDIN>);
 	return 'RUN_DISC_REPORT' if $choice eq 'y';
 	return 'MENU_DISC_OPT' if $choice eq 'n';
@@ -362,7 +620,7 @@ sub MENU_DISC_OPT {
 
 sub FN_RUN_DISC_REPORT
 {
-	print "\nYour Disconnect report is running \n";
+	print "\nYour Disconnect report is running \n\n";
 	runDisconnectReport();
 	sendAttachment(
 	    'AuraAudits@potomacintegration.com>',
@@ -372,18 +630,26 @@ sub FN_RUN_DISC_REPORT
 	    'Your Disconnect Report is attached
 
 	    ',
-	    
 	);
+	print "\n\nReport "."[".$DisconnectReport."]"." is complete!\n\n"; 
 	return '';
 }
 
 sub MENU_IPENDPT_OPT {
-	print "\n IP EndPoint Report\n";
-	print 'Enter an Email address to send the report: ';
+	print "\n\n";
+	print "    ************************************\n";
+	print "    *	  IP-Endpoint Report Menu      *\n";
+	print "    *	                               *\n";
+	print "    *	                               *\n";
+	
+	print "    ************************************\n";
+	print "\n\n";
+	print "Enter an Email address to send the report: ";
 	chomp($emailaddresses = <STDIN>);
 	print '
-	The report will be sent to: [' . $emailaddresses . ']
-	Are the addresses above correct? (y/n):';
+	The report will be sent to: ';
+	print "[" . $emailaddresses . ']';
+	print "\n\nAre the addresses above correct? (y/n):";
 	chomp($choice = <STDIN>);
 	return 'RUN_IPENDPT_REPORT' if $choice eq 'y';
 	return 'MENU_IPENDPT_OPT' if $choice eq 'n';
@@ -395,7 +661,7 @@ sub MENU_IPENDPT_OPT {
 
 sub FN_RUN_IPENDPT_REPORT
 {
-	print "\nYour IP-Endpoint report is running \n";
+	print "\n\nYour IP-Endpoint report is running \n\n";
 
 	runIPEndPointReport();
 	sendAttachment(
@@ -408,7 +674,7 @@ sub FN_RUN_IPENDPT_REPORT
 	    ',
 	    
 	);
-
+	print "\n\nReport "."[".$IPEndpointReport."]"." is complete!\n\n"; 
 	return '';
 }
 
