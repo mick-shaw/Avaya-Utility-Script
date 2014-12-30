@@ -1,32 +1,36 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
+
   <head>
-    <meta charset="utf-8">
+    <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <title>Avaya-utility-script by mick-shaw</title>
+    <meta name="description" content="Avaya-utility-script : Combines multiple report subroutines into on application">
 
-    <link rel="stylesheet" href="stylesheets/styles.css">
-    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
-    <script src="javascripts/scale.fix.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
 
-    <!--[if lt IE 9]>
-    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
+    <title>Avaya-utility-script</title>
   </head>
+
   <body>
-    <div class="wrapper">
-      <header>
-        <h1>Avaya-utility-script</h1>
-        <p>Combines multiple report subroutines into on application</p>
-        <p class="view"><a href="https://github.com/mick-shaw/Avaya-Utility-Script">View the Project on GitHub <small>mick-shaw/Avaya-Utility-Script</small></a></p>
-        <ul>
-          <li><a href="https://github.com/mick-shaw/Avaya-Utility-Script/zipball/master">Download <strong>ZIP File</strong></a></li>
-          <li><a href="https://github.com/mick-shaw/Avaya-Utility-Script/tarball/master">Download <strong>TAR Ball</strong></a></li>
-          <li><a href="https://github.com/mick-shaw/Avaya-Utility-Script">View On <strong>GitHub</strong></a></li>
-        </ul>
-      </header>
-      <section>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/mick-shaw/Avaya-Utility-Script">View on GitHub</a>
+
+          <h1 id="project_title">Avaya-utility-script</h1>
+          <h2 id="project_tagline">Combines multiple report subroutines into on application</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/mick-shaw/Avaya-Utility-Script/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/mick-shaw/Avaya-Utility-Script/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
         <h3>
 <a id="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages" aria-hidden="true"><span class="octicon octicon-link"></span></a>Welcome to GitHub Pages.</h3>
 
@@ -58,14 +62,40 @@ $ git checkout gh-pages
 <h3>
 <a id="support-or-contact" class="anchor" href="#support-or-contact" aria-hidden="true"><span class="octicon octicon-link"></span></a>Support or Contact</h3>
 
-<p>Having trouble with Pages? Check out the documentation at <a href="https://help.github.com/pages">https://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
+<p>Having trouble with Pages? Check out the documentation at <a href="https://help.github.com/pages">https://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.
+Over the course of time, I've come to find that there are several data elements that cannot easily be gathered through the traditional Avaya System Administration Terminal or System Manager.</p>
+
+<p>For example, I find it useful to perform an audit of all Avaya H323 endpoints before and after upgrades. In the event you lose an endpoint, knowing the mac-address can significantly help you track down the endpoint to a specific port. Unfortunately, the only means of doing this is to perform a status station on each and every endpoint - not very practical or efficient when you're dealing with thousands of endpoints.</p>
+
+<p>In addition, there is useful information about the end-points that can only be gathered via SNMP. For example, the serial number of the phone, the list of alternate gate keepers, active DHCP server, etc. Unless you have expensive management tools already actively managing these devices, it can be extremely difficult to gather this information.</p>
+
+<p>Another example, is simply generating a "trusted" list of disconnected stations. While you can do a "display error" and filter on a specific error type (ie. 3329), I've found this method to generate inaccacurate results. Statusing each station and noting the state (disconnected or out-of-service) is the most accurate.</p>
+
+<p>Another example would be searching vectors for specific values. If you want to search vectors for all extensions that are associated with a messaging command, there's no way to check without displaying each and every vector.</p>
+
+<p>This ever-growing application is a collection of routines I've put together to quickly generate system reports as briefly described above.</p>
+
+<p>A little bit about some of the routines:</p>
+
+<p>The $MIB1 and $MIB2 variables in the SNMP subroutine can be changed to any Avaya endpoint OID you want to snag.</p>
+
+<p>The "$PBX" variable defines the CM instance. The connection details of each instance are defined in the OSSI Module (cli_ossi.pm).</p>
+
+<p>The cli_ossi module included is a modified version of Ben Roy's Definity.pm which is used to interface with Communication Manager via XML Interface. <a href="https://github.com/benroy73/pbxd">https://github.com/benroy73/pbxd</a>.</p>
+
+<p>The SNMP modules included should not be confused with the SNMP perl modules found in CPAN (i.e. Net::SNMP). The modules I've included were previously maintained by <a href="http://www.switch.ch/misc/leinen/snmp/perl/">http://www.switch.ch/misc/leinen/snmp/perl/</a> They are now publicly available on code.google.com/p/snmp-session The entire package which includes all three modules can be downloaded from <a href="https://snmp-session.googlecode.com/files/SNMP_Session-1.13.tar.gz">https://snmp-session.googlecode.com/files/SNMP_Session-1.13.tar.gz</a></p>
       </section>
     </div>
-    <footer>
-      <p>Project maintained by <a href="https://github.com/mick-shaw">mick-shaw</a></p>
-      <p>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></p>
-    </footer>
-    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Avaya-utility-script maintained by <a href="https://github.com/mick-shaw">mick-shaw</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
     
+
   </body>
 </html>
