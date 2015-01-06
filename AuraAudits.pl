@@ -1,15 +1,11 @@
 #!/usr/bin/perl -w
-use strict;
-
-require "./cli_ossi.pm";
-import cli_ossi;
 
 ##########################################################
 # 			Aura Audit Utility 
 #
 # Author: Mick Shaw
 # Company: Potomac Integration and Consulting
-# Date: 12/19/2014
+# Date: 01/06/2014
 #
 #
 #	A collection of report tools that are used for gathering
@@ -20,8 +16,8 @@ import cli_ossi;
 #  details of each instance are defined in the OSSI
 #  Module (cli_ossi.pm).
 #
-# Note: If the $PBX variable changes, the OSSI Module must
-#       be updated as well
+# Note: only values that have bee defined in the cli_ossi module 
+#  can be used in the $PBX variable
 #
 ###########################################################
 # IP-Phone Report
@@ -73,10 +69,16 @@ import cli_ossi;
 # The entire package which includes all three modules can be downloaded
 # modules can be downloaded from
 # https://snmp-session.googlecode.com/files/SNMP_Session-1.13.tar.gz
-use lib './SNMP_Session-1.13/lib';
+use strict;
+
+require "/opt/AvayaWebservice/cli_ossi.pm";
+import cli_ossi;
+
+
+use lib '/opt/AvayaWebservice/SNMP_Session-1.13/lib';
 
 # Local library
-use lib './Otherlibs';
+use lib '/opt/AvayaWebservice/Otherlibs';
 
 use BER;
 use SNMP_util;
@@ -182,9 +184,9 @@ my $AvayaOIDSN_01 = "1.3.6.1.4.1.6889.2.69.2.1.46.0";
 my $AvayaOIDSN_02 = "1.3.6.1.4.1.6889.2.69.5.1.79.0";
 my $Object_Value;
 
-my $DisconnectReport = '' . timestamp() . '-DisconnectReport.csv';
-my $IPEndpointReport = '' . timestamp() . '-IPEndpointReport.csv';
-my $MsgVectorReport = '' . timestamp() . '-MsgVectorReport.csv';
+our $DisconnectReport = '' . timestamp() . '-' . $pbx . '-DisconnectReport.csv';
+our $IPEndpointReport = '' . timestamp() . '-' . $pbx . '-IPEndpointReport.csv';
+our $MsgVectorReport = '' . timestamp() . '-' . $pbx . '-MsgVectorReport.csv';
 
 my $data;
 my $msg;
@@ -196,8 +198,15 @@ MENU_DISC_OPT => \&MENU_DISC_OPT, #
 MENU_IPENDPT_OPT => \&MENU_IPENDPT_OPT, #
 MENU_MSGVCTR_OPT => \&MENU_MSGVCTR_OPT, #
 
+MENU_IPENDPT_WITHSNMP_OPT => \&MENU_IPENDPT_WITHSNMP_OPT, #
+MENU_IPENDPT_WITHOUTSNMP_OPT=> \&MENU_IPENDPT_WITHOUTSNMP_OPT, #
+
 RUN_DISC_REPORT => \&FN_RUN_DISC_REPORT, #
-RUN_IPENDPT_REPORT => \&FN_RUN_IPENDPT_REPORT, #
+
+
+RUN_IPENDPT_WITHSNMP_REPORT => \&FN_RUN_IPENDPT_WITHSNMP_REPORT, #
+RUN_IPENDPT_WITHOUTSNMP_REPORT => \&FN_RUN_IPENDPT_WITHOUTSNMP_REPORT, #
+
 RUN_MSGVCTR_REPORT => \&FN_RUN_MSGVCTR_REPORT, #
 );
 
@@ -420,7 +429,7 @@ sub getListStations
 	return @station;
 }
 
-sub runIPEndPointReport
+sub runIPEndPointReport_with_SNMP
 {
 
 $node = new cli_ossi($pbx, $debug);
@@ -456,6 +465,39 @@ $node->do_logoff();
 
 }
 
+sub runIPEndPointReport_without_SNMP
+{
+
+$node = new cli_ossi($pbx, $debug);
+	unless( $node && $node->status_connection() ) {
+		die("ERROR: Login failed for ". $node->get_node_name() );
+	}
+	# Print out CSV column headers.
+	open(my $fh, '>', $IPEndpointReport) or die "Could not open file '$IPEndpointReport' $!";
+
+	print $fh "Extension,Programmed Set Type,IP Address,Service State,Connected Set Type,MAC Address,Firmware"."\n";
+	print 	  "Extension,Programmed Set Type,IP Address,Service State,Connected Set Type,MAC Address,Firmware"."\n";
+	
+	
+	foreach $voipphone (getRegisteredPhones($node))
+	{
+		# Exclude any adresses - For example, I don't want the Avaya AES.
+			if ($voipphone->{$PBXListRegistered_IPAddress} !~ /^10\.88\.1\.36/)
+			{
+				
+				$PhoneFields =getPhoneFields($node,$voipphone->{$PBXListRegistered_Extension});
+
+				print $fh $voipphone->{$PBXListRegistered_Extension}.",";
+				print $fh $PhoneFields;
+				print $voipphone->{$PBXListRegistered_Extension}.",";
+				print $PhoneFields;
+
+			}
+	}
+close	$fh;
+$node->do_logoff();
+
+}
 
 sub runDisconnectReport
 {
@@ -527,7 +569,6 @@ sub MENU_MAIN {
 		} else {
 			$pbx = 'micklabs';
 			return 'REPORT_MAIN';
-		
 	}
 
 	
@@ -535,6 +576,11 @@ sub MENU_MAIN {
 }
 
 sub REPORT_MAIN {
+
+our $DisconnectReport = '' . timestamp() . '-' . $pbx . '-DisconnectReport.csv';
+our $IPEndpointReport = '' . timestamp() . '-' . $pbx . '-IPEndpointReport.csv';
+our $MsgVectorReport = '' . timestamp() . '-' . $pbx . '-MsgVectorReport.csv';
+
 	print "\n\n";
 	print "    ************************************\n";
 	print "    *	  Aura Audit Report Menu       *\n";
@@ -549,17 +595,22 @@ sub REPORT_MAIN {
 
 	print 'Select your Activity: ';
 	chomp($choice = <STDIN>);
-
-	return 'MENU_DISC_OPT' if $choice == 1;
-	return 'MENU_IPENDPT_OPT' if $choice == 2;
-	return 'MENU_MSGVCTR_OPT' if $choice == 3;
-
-	return '';
+	if ($choice == 1){
+		return 'MENU_DISC_OPT';
+	}
+		elsif ($choice == 2) {
+			return 'MENU_IPENDPT_OPT';
+		} elsif ($choice == 3) {
+			return 'MENU_MSGVCTR_OPT';
+		} else {
+			return 'REPORT_MAIN';
+	}
+	return 'REPORT_MAIN';
 }
 
 sub MENU_MSGVCTR_OPT {
 	print "\n\n";
-	print "    ************************************\n";
+	print "    *************************************\n";
 	print "    *    Message Vector Report Menu     *\n";
 	print "    *	                               *\n";
 	print "    *	                               *\n";
@@ -573,32 +624,24 @@ sub MENU_MSGVCTR_OPT {
 	print "[" . $emailaddresses . ']';
 	print "\n\nAre the addresses above correct? (y/n):";
 	chomp($choice = <STDIN>);
-	return 'RUN_MSGVCTR_REPORT' if $choice eq 'y';
-	return 'MENU_MSGVCTR_OPT' if $choice eq 'n';
-	return 'MENU_MAIN';
+
+	if ($choice eq 'y'){
+		return 'RUN_MSGVCTR_REPORT';
+	}
+		elsif ($choice eq 'n') {
+			return 'RUN_MSGVCTR_REPORT';
+		} else {
+			return 'REPORT_MAIN';
+	}
+	return 'REPORT_MAIN';
+}
+
 	
-}
 
-sub FN_RUN_MSGVCTR_REPORT
-{
-	print "\nYour Message Vector report is running \n\n";
-	runMessageVectorReport();
-	sendAttachment(
-	    'AuraAudits@potomacintegration.com>',
-	    $emailaddresses,
-	    'Message Vector Report',
-	    $MsgVectorReport,
-	    'Your Message Vector Report is attached
-
-	    ',
-	);
-	print "\n\nReport "."[".$MsgVectorReport."]"." is complete!\n\n"; 
-	return '';
-}
 
 sub MENU_DISC_OPT {
 	print "\n\n";
-	print "    ************************************\n";
+	print "    *************************************\n";
 	print "    *	  Disconnect Report Menu       *\n";
 	print "    *	                               *\n";
 	print "    *	                               *\n";
@@ -612,30 +655,42 @@ sub MENU_DISC_OPT {
 	print "[" . $emailaddresses . ']';
 	print "\n\nAre the addresses above correct? (y/n):";
 	chomp($choice = <STDIN>);
-	return 'RUN_DISC_REPORT' if $choice eq 'y';
-	return 'MENU_DISC_OPT' if $choice eq 'n';
-	return 'MENU_MAIN';
-	
-}
-
-sub FN_RUN_DISC_REPORT
-{
-	print "\nYour Disconnect report is running \n\n";
-	runDisconnectReport();
-	sendAttachment(
-	    'AuraAudits@potomacintegration.com>',
-	    $emailaddresses,
-	    'Disconnect Report',
-	    $DisconnectReport,
-	    'Your Disconnect Report is attached
-
-	    ',
-	);
-	print "\n\nReport "."[".$DisconnectReport."]"." is complete!\n\n"; 
-	return '';
+	if ($choice eq 'y'){
+		return 'RUN_DISC_REPORT';
+	}
+		elsif ($choice eq 'n') {
+			return 'MENU_DISC_OPT';
+		} else {
+			return 'REPORT_MAIN';
+	}
+	return 'REPORT_MAIN';
 }
 
 sub MENU_IPENDPT_OPT {
+	print "\n\n";
+	print "    *************************************\n";
+	print "    *	  IP-Endpoint Report Menu      *\n";
+	print "    *	                               *\n";
+	print "    *	                               *\n";
+	
+	print "    ************************************\n";
+	print "\n\n";
+	print "\n\nDo you want to gather SNMP data? (y/n):";
+	chomp($choice = <STDIN>);
+	
+	if ($choice eq 'y'){
+		return 'MENU_IPENDPT_WITHSNMP_OPT';
+	}
+		elsif ($choice eq 'n') {
+			return 'MENU_IPENDPT_WITHOUTSNMP_OPT';
+		} else {
+			return 'REPORT_MAIN';
+	}
+	return 'REPORT_MAIN';	
+
+}
+
+sub MENU_IPENDPT_WITHSNMP_OPT {
 	print "\n\n";
 	print "    ************************************\n";
 	print "    *	  IP-Endpoint Report Menu      *\n";
@@ -651,25 +706,94 @@ sub MENU_IPENDPT_OPT {
 	print "[" . $emailaddresses . ']';
 	print "\n\nAre the addresses above correct? (y/n):";
 	chomp($choice = <STDIN>);
-	return 'RUN_IPENDPT_REPORT' if $choice eq 'y';
-	return 'MENU_IPENDPT_OPT' if $choice eq 'n';
-	return 'MENU_MAIN';
+	if ($choice eq 'y'){
+		return 'RUN_IPENDPT_WITHSNMP_REPORT';
+	}
+		elsif ($choice eq 'n') {
+			return 'MENU_IPENDPT_OPT';
+		} else {
+			return 'REPORT_MAIN';
+	}
+	return 'REPORT_MAIN';	
 	
 }
 
+sub MENU_IPENDPT_WITHOUTSNMP_OPT {
+	print "\n\n";
+	print "    ************************************\n";
+	print "    *	  IP-Endpoint Report Menu      *\n";
+	print "    *	                               *\n";
+	print "    *	                               *\n";
+	
+	print "    ************************************\n";
+	print "\n\n";
+	print "Enter an Email address to send the report: ";
+	chomp($emailaddresses = <STDIN>);
+	print '
+	The report will be sent to: ';
+	print "[" . $emailaddresses . ']';
+	print "\n\nAre the addresses above correct? (y/n):";
+	chomp($choice = <STDIN>);
+	if ($choice eq 'y'){
+		return 'RUN_IPENDPT_WITHOUTSNMP_REPORT';
+	}
+		elsif ($choice eq 'n') {
+			return 'MENU_IPENDPT_OPT';
+		} else {
+			return 'MENU_MAIN';
+	}
+	return 'MENU_MAIN';	
+	
 
+}
 
-sub FN_RUN_IPENDPT_REPORT
+sub FN_RUN_MSGVCTR_REPORT
 {
-	print "\n\nYour IP-Endpoint report is running \n\n";
-
-	runIPEndPointReport();
+	print "\nYour Message Vector report is running \n\n";
+	runMessageVectorReport();
 	sendAttachment(
-	    'AuraAudits@potomacintegration.com>',
+	    'AuraAudits@dc.gov>',
+	    $emailaddresses,
+	    'Message Vector Report',
+	    $MsgVectorReport,
+	    'Your Message Vector Report for ' . $pbx .  'is attached
+
+	    ',
+	);
+	print "\n\nReport "."[".$MsgVectorReport."]"." is complete!\n\n"; 
+	return '';
+}
+
+sub FN_RUN_DISC_REPORT
+{
+	print "\nYour Disconnect report for $pbx is running \n\n";
+	runDisconnectReport();
+	sendAttachment(
+	    'AuraAudits@dc.gov>',
+	    $emailaddresses,
+	    'Disconnect Report',
+	    $DisconnectReport,
+	    'Your Disconnect Report for ' . $pbx .  ' is attached
+
+	    ',
+	);
+	print "\n\nReport "."[".$DisconnectReport."]"." is complete!\n\n"; 
+	return '';
+}
+
+sub FN_RUN_IPENDPT_WITHSNMP_REPORT
+{
+	print "\n\nYour IP-Endpoint report for $pbx is running \n\n";
+
+	
+
+runIPEndPointReport_with_SNMP();
+	sendAttachment(
+	    'AuraAudits@dc.gov>',
 	    $emailaddresses,
 	    'IP-Endpoint Report',
 	    $IPEndpointReport,
-	    'Your IP-Endpoint Report is attached
+	    'Your IP-Endpoint Report for ' . $pbx .  ' is attached
 
 	    ',
 	    
@@ -678,6 +802,26 @@ sub FN_RUN_IPENDPT_REPORT
 	return '';
 }
 
+sub FN_RUN_IPENDPT_WITHOUTSNMP_REPORT
+{
+	print "\n\nYour IP-Endpoint report for $pbx is running \n\n";
+
+	
+
+runIPEndPointReport_without_SNMP();
+	sendAttachment(
+	    'AuraAudits@dc.gov>',
+	    $emailaddresses,
+	    'IP-Endpoint Report',
+	    $IPEndpointReport,
+	    'Your IP-Endpoint Report for ' . $pbx .  ' is attached
+
+	    ',
+	    
+	);
+	print "\n\nReport "."[".$IPEndpointReport."]"." is complete!\n\n"; 
+	return '';
+}
 
  my $next = MENU_MAIN();
  	while (1)
