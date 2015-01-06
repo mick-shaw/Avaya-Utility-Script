@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 
-require "./cli_ossi.pm";
+require "/opt/AvayaOSSI/Avaya-Utility-Script/cli_ossi.pm";
 import cli_ossi;
 
 ##########################################################
@@ -73,10 +73,10 @@ import cli_ossi;
 # The entire package which includes all three modules can be downloaded
 # modules can be downloaded from
 # https://snmp-session.googlecode.com/files/SNMP_Session-1.13.tar.gz
-use lib './SNMP_Session-1.13/lib';
+use lib '/opt/AvayaOSSI/Avaya-Utility-Script/SNMP_Session-1.13/lib';
 
 # Local library
-use lib './Otherlibs';
+#use lib './Otherlibs';
 
 use BER;
 use SNMP_util;
