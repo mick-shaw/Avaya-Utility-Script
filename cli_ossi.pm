@@ -85,16 +85,7 @@ my $openssl_command = '/usr/bin/openssl s_client -quiet -connect';
 # pbx_config contains the connection details for the PBX systems
 # name   hostname   port   username    password    connection_type    atdt_number
 my %pbx_config = (
-  ouc2		   => [ 'ouc2',   '10.88.1.10',  '5022', 'webservice',  'Dragonf1r3',  'ssh', '' ],
-  ojs		   => [ 'ojs',   '10.88.2.10',  '5022', 'webservice',  'Dragonf1r3',  'ssh', '' ],
-  rvs	           => [ 'rvs', '10.88.0.10',  '5022', 'webservice',  'Dragonf1r3',  'ssh', '' ],
-  ouc1	           => [ 'ouc1', '10.30.2.14', '5023','username', 'password', 'telnet', ''],
-  pscc	           => [ 'pscc', '10.30.2.14', '5023','username', 'password', 'telnet', ''],
-  hsema	           => [ 'hsema', '10.30.2.14', '5023','username', 'password', 'telnet', ''],
-  dyrs	           => [ 'dyrs', '10.30.2.14', '5023','username', 'password', 'telnet', ''],
-  micklabs         => [ 'micklabs', '192.168.1.210',  '5022', 'labs',  'Dragonf1r3',  'ssh', '' ],	
-  sa09             => [ 'sa09', '10.192.32.10', '5022', 'labs', 'Dragonf1r3', 'ssh', '' ],
-  voa              => [ 'voa', '192.11.13.6', '5022', 'brooks', 'brooks1', 'ssh', '' ],
+  ouc2		   => [ 'ouc2',   '10.88.1.10',  '5022', 'username',  'Password',  'ssh', '' ],
 );
 
 #=============================================================
