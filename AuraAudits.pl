@@ -443,7 +443,7 @@ $node = new cli_ossi($pbx, $debug);
 	
 	foreach $voipphone (getRegisteredPhones($node))
 	{
-		# Exclude any adresses - For example, I don't want the Avaya AES.
+		# Exclude any addresses - For example, I don't want the Avaya AES.
 			if ($voipphone->{$PBXListRegistered_IPAddress} !~ /^10\.88\.1\.36/)
 			{
 				$serialnumber = getserialnum($voipphone->{$PBXListRegistered_IPAddress});
