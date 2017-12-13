@@ -85,7 +85,7 @@ my $openssl_command = '/usr/bin/openssl s_client -quiet -connect';
 # pbx_config contains the connection details for the PBX systems
 # name   hostname   port   username    password    connection_type    atdt_number
 my %pbx_config = (
-  ouc2		   => [ 'ouc2',   '10.88.1.10',  '5022', 'username',  'Password',  'ssh', '' ],
+  ouc2		   => [ 'ouc2',   '1.1.1.1',  '5022', 'username',  'Password',  'ssh', '' ],
 );
 
 #=============================================================
